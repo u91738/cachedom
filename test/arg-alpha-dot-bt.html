@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<head>
+    <script>
+        const p = new URLSearchParams(document.location.search)
+        const a = p.get('a')
+        if(a.match('^[a-z0-9.`]*$') !== null)
+            eval(p.get('a'))
+    </script>
+</head>
+<body></body>

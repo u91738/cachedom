@@ -15,8 +15,12 @@ let private invEq (a:string) (b:string) =
     a.Equals(b, StringComparison.OrdinalIgnoreCase)
 
 let private consoleMsgEq log msg =
-    let lm = Regex.Match(log, "console-api [:0-9]* \"(.*)\"")
-    lm.Groups.Count > 1 && invEq lm.Groups[1].Value msg
+    [| "console-api [:0-9]* \"(.*)\""; "console-api [:0-9]* (.*)" |]
+    |> Array.exists (fun rex ->
+        let lm = Regex.Match(log, rex)
+        lm.Groups.Count > 1 && invEq lm.Groups[1].Value msg
+    )
+
 
 let private hasLog (browser:IWebDriver) value =
     browser.Manage().Logs.GetLog "browser"

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+    <head></head>
+    <body>
+        <div id="app"></div>
+        <script>
+            const b = decodeURI(document.location.hash.substring(1))
+            if(!b.includes('<') && !b.includes('>'))
+                document.getElementById('app').innerHTML = `<component ${b} > <p ${b} >`
+            //console.log(document.getElementById('app').innerHTML)
+        </script>
+        <script src="external/vue.js/3.0.0/vue.js"></script>
+        <script nonce="noncenoncenonce">
+            const app = Vue.createApp({
+                            data() { return { input: '# hello' } }
+                        })
+            app.mount('#app')
+        </script>
+    </body>
+</html>

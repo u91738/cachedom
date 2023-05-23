@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script type="text/javascript" src="external/angular.js/1.0.1/angular.js"></script>
+        <script>
+            const body=decodeURI(document.location.hash.substring(1))
+            if(!body.includes('<'))
+                document.write('{{' + body + '}}')
+        </script>
+    </head>
+    <body ng-app>
+    </body>
+</html>

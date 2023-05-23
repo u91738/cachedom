@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+    <head></head>
+    <body>
+        <div id="app">
+            <svg@load=this.console.log(1233321)></svg>
+        </div>
+
+        <script>
+            const b = decodeURI(document.location.hash.substring(1))
+            if(!b.includes('<') && !b.includes('>'))
+                document.getElementById('app').innerHTML = `<img ${b} > <p ${b} >`
+            console.log(document.getElementById('app').innerHTML)
+        </script>
+        <script src="external/vue.js/2.6.12/vue.js"></script>
+        <script nonce="noncenoncenonce">
+            new Vue({ el: '#app', data: { message: 'aaa' } })
+        </script>
+    </body>
+</html>

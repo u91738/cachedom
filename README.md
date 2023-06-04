@@ -1,13 +1,10 @@
 # cachedom
 Tool to look for DOM XSS with lots of caching and minimal server load.
 
-running as
-```shell
-cachedom --url http://example.com?a=123
-```
-will make cachedom go to `http://example.com?a=123`, cache every HTTP request,
+running as `cachedom --url http://example.com?a=123` will make cachedom go to `http://example.com?a=123`, cache every HTTP request,
 then try XSS payloads in parameters found in url (`a=...`) and url fragment (`http://example.com?a=123#...`)
 in hope of finding a DOM XSS vulnerability with minimal load on the server.
+
 If new parameters make the page create network requests that are not in cache - they will go to the server.
 
 For more options

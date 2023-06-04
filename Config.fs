@@ -10,6 +10,13 @@ type XssPayload = {
     Payload: string
 }
 
+type XssPayloadGroup = {
+    [<JsonProperty(Required = Required.Default)>]
+    Regex: string
+    [<JsonProperty(Required = Required.Always)>]
+    Payloads: XssPayload[]
+}
+
 type Config = {
     [<JsonProperty(Required = Required.Always)>]
     ProxyPort: int
@@ -24,7 +31,9 @@ type Config = {
     [<JsonProperty(Required = Required.Always)>]
     WaitAfterNavigation: int
     [<JsonProperty(Required = Required.Always)>]
-    Payloads: XssPayload[]
+    JsBodyFilter: bool
+    [<JsonProperty(Required = Required.Always)>]
+    Payloads: XssPayloadGroup[]
 }
 
 let read filename =

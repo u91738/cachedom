@@ -1,6 +1,5 @@
 ﻿open System
 open Config
-open Gen
 open Check
 
 let private help ="""cachedom - search for DOM XSS with limited interaction with server
@@ -16,6 +15,8 @@ OPTIONS
     check urls used in subrequests of what was passed in --url ... (AJAX, frames)
 -p PORT, --proxy-port PORT
     port to use for internal proxy server
+--js-body-filter, --no-js-body-filter
+    only check pages if they have on...=, javascript, <script etc in their body
 --show-browser
     do not run browser in headless mode, mostly a debug feature
 --cache-mode [precise|strip-arg-values|strip-arg-names-values]
@@ -55,13 +56,17 @@ let rec private parseArgs args urls conf =
         parseArgs tail urls {conf with CacheMode = HttpCache.Mode.StripArgValues }
     | "--cache-mode" :: "strip-arg-names-values" :: tail ->
         parseArgs tail urls {conf with CacheMode = HttpCache.Mode.StripArgNamesValues }
+    | "--js-body-filter" :: tail ->
+        parseArgs tail urls {conf with JsBodyFilter = true }
+    | "--no-js-body-filter" :: tail ->
+        parseArgs tail urls {conf with JsBodyFilter = false }
     | [] -> Some (urls, conf)
     | _ -> failwith "Failed to parse arguments"
 
 let private typeDesc t =
     match t with
-    | Fragment -> "Url #fragment"
-    | Arg arg -> sprintf "GET parameter \"%s\"" arg
+    | Url.Inputs.Fragment -> "Url #fragment"
+    | Url.Inputs.Arg arg -> sprintf "GET parameter %d" arg
 
 let private withColor c f =
     let old = Console.ForegroundColor
@@ -69,11 +74,11 @@ let private withColor c f =
     f()
     Console.ForegroundColor <- c
 
-let private urlReport res =
+let private urlReport input res =
     match res with
-    | Exec (input, value) ->
-        printfn "%s leads to JS execution in Url:" (typeDesc input.Type)
-        withColor ConsoleColor.Yellow (fun () -> printfn "%s" (string value.Url))
+    | Exec value ->
+        printfn "%s leads to JS execution in Url:" (typeDesc input)
+        withColor ConsoleColor.Yellow (fun () -> printfn "%s" (string value))
     | Refl refl ->
         for k, v in Array.groupBy snd refl do
             printfn "%A charsets:" k
@@ -102,6 +107,13 @@ let main argv =
         use _ = Proxy.start (ProxyHandler.onRequest false cache) (ProxyHandler.onResponse cache) conf.ProxyPort
         let selproxy = Proxy.selenium "localhost" conf.ProxyPort
         use browser = Browser.get selproxy (not conf.ShowBrowser) conf.UserAgent
+        let ctx = {
+            Browser = browser
+            Cache = cache
+            Payloads = conf.Payloads
+            WaitAfterNavigation = conf.WaitAfterNavigation
+        }
+        let filterMode = if conf.JsBodyFilter then Filter else Brute
 
         printfn "------------------------------------------------------------"
         for url in urls do
@@ -112,10 +124,10 @@ let main argv =
                     let method, cachedUrl = cached.Key
                     if method = "GET" && cached.Value.HeaderText.Contains("text/html", StringComparison.InvariantCultureIgnoreCase) then
                         printfn "Check url: %s" (string cachedUrl)
-                        for res in Check.url browser conf.Payloads (Uri cachedUrl) conf.WaitAfterNavigation do
-                            urlReport res
+                        for input, res in Check.url ctx filterMode (Uri cachedUrl) do
+                            urlReport input res
             else
                 printfn "Check url: %s" (string url)
-                for res in Check.url browser conf.Payloads url conf.WaitAfterNavigation do
-                    urlReport res
+                for input, res in Check.url ctx filterMode url do
+                    urlReport input res
         0

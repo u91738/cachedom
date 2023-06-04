@@ -12,6 +12,8 @@ module Fragment=
 
     let drop (u:Uri) = set u ""
 
+    let map (u:Uri) f = set u (f u.Fragment)
+
 module Args=
 
     let toTuple (s:string) =
@@ -52,6 +54,8 @@ module Args=
         r.Query <- join args
         r.Uri
 
+    let getNth (u:Uri) index = (get u)[index]
+
     let setVal newVal k _ = k, Uri.EscapeDataString newVal
 
     let setName newVal _ v = Uri.EscapeDataString newVal, v
@@ -61,3 +65,24 @@ module Args=
             1 + u.Query.Count(fun i -> i = '&')
         else
             0
+
+module Inputs =
+    [<DefaultAugmentationAttribute(false)>]
+    type Input = Arg of int | Fragment
+    with
+        member this.IsFragment =
+            match this with
+            | Fragment -> true
+            | _ -> false
+
+    let get url =
+        [|
+            for i in 0 .. Args.count url - 1 do
+                Arg i
+            Fragment
+        |]
+
+    let map url f arg =
+        match arg with
+        | Fragment -> Fragment.map url f
+        | Arg n -> Args.mapNth url n (fun k v -> k, f v)

@@ -12,6 +12,7 @@ type HttpCache = private {
     Precise: Dictionary<string * string, Response>
     NoArgValues: Dictionary<string * string, Response>
     NoArgNamesValues: Dictionary<string * string, Response>
+    Recent: ResizeArray<string * string>
 }
 
 let empty mode = {
@@ -20,6 +21,7 @@ let empty mode = {
     Precise = Dictionary()
     NoArgValues = Dictionary()
     NoArgNamesValues = Dictionary()
+    Recent = ResizeArray()
 }
 
 let private uriNoArg (u:string) replaceNames =
@@ -30,6 +32,7 @@ let private uriNoArg (u:string) replaceNames =
 
 let add cache method url resp =
     lock cache.Lock (fun () ->
+        cache.Recent.Add(method, url)
         cache.Precise[(method, url)] <- resp
         if cache.Mode = StripArgValues || cache.Mode = StripArgNamesValues then
             cache.NoArgValues[(method, uriNoArg url false)] <- resp
@@ -37,18 +40,33 @@ let add cache method url resp =
             cache.NoArgNamesValues[(method, uriNoArg url true)] <- resp
     )
 
-let get cache method url =
-    lock cache.Lock (fun () ->
-        match cache.Precise.TryGetValue ((method, url)) with
+let private _get cache method url =
+    match cache.Precise.TryGetValue ((method, url)) with
+    | true, r -> Some r
+    | _ ->
+        match cache.NoArgValues.TryGetValue ((method, uriNoArg url false)) with
         | true, r -> Some r
         | _ ->
-            match cache.NoArgValues.TryGetValue ((method, uriNoArg url false)) with
+            match cache.NoArgNamesValues.TryGetValue ((method, uriNoArg url true)) with
             | true, r -> Some r
-            | _ ->
-                match cache.NoArgNamesValues.TryGetValue ((method, uriNoArg url true)) with
-                | true, r -> Some r
-                | _ -> None
+            | _ -> None
+
+let get cache method url =
+    lock cache.Lock (fun () ->
+        cache.Recent.Add(method, url)
+        _get cache method url
     )
+
+let getRecent cache =
+    lock cache.Lock (fun () -> cache.Recent.ToArray())
+
+let getRecentResponses cache =
+    lock cache.Lock (fun () ->
+        cache.Recent |> Seq.choose (fun (m, u) -> _get cache m u) |> Seq.toArray
+    )
+
+let clearRecent cache =
+    lock cache.Lock (fun () -> cache.Recent.Clear())
 
 let getAll cache =
     lock cache.Lock (fun () -> Array.ofSeq cache.Precise)

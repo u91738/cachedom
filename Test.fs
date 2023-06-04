@@ -168,3 +168,21 @@ type Tests(ctx:BrowserFixture, srv:ServerFixture) =
         let r = Check.url ctx.Ctx filter url
         test <@ execOnly r  @>
         test <@ hasArgExec r  @>
+
+    [<Fact>]
+    member _.``No arg static``() =
+        let url = Uri $"http://{localhost}:8000/static.html"
+        let r = Check.url ctx.Ctx filter url
+        test <@ r.Length = 0  @>
+
+    [<Fact>]
+    member _.``No arg boring js``() =
+        let url = Uri $"http://{localhost}:8000/boring-js.html"
+        let r = Check.url ctx.Ctx filter url
+        test <@ r.Length = 0  @>
+
+    [<Fact>]
+    member _.``Arg boring js``() =
+        let url = Uri $"http://{localhost}:8000/boring-js.html?a=123"
+        let r = Check.url ctx.Ctx filter url
+        test <@ r.Length = 0  @>

@@ -3,6 +3,7 @@ module Browser
 open System
 open System.IO
 open System.Reflection
+open System.Text.RegularExpressions
 open System.Threading
 open OpenQA.Selenium
 open OpenQA.Selenium.Chrome
@@ -41,8 +42,22 @@ let navigate (browser:IWebDriver) refresh (url:Uri) (waitAfter:int) =
     waitUrlChange browser u
     Thread.Sleep waitAfter
 
-module Cookie =
+let private stripQuotes (s:string) =
+    if s.StartsWith '"' && s.EndsWith '"' then
+        s.Substring(1, s.Length - 1)
+    else
+        s
 
+let consoleLog (browser:IWebDriver) =
+    let rex = Regex("console-api [:0-9]* (.*)")
+    browser.Manage().Logs.GetLog "browser"
+    |> Seq.choose (fun log ->
+        match rex.Match(log.Message) with
+        | m when m.Groups.Count > 1 -> Some (stripQuotes m.Groups[1].Value)
+        | _ -> None
+    )
+
+module Cookie =
     let all (browser:IWebDriver) =
         browser.Manage().Cookies.AllCookies |> Seq.toArray
 

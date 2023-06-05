@@ -3,19 +3,7 @@ module Config
 open System.IO
 open Newtonsoft.Json
 
-type XssPayload = {
-    [<JsonProperty(Required = Required.Always)>]
-    Msg: string
-    [<JsonProperty(Required = Required.Always)>]
-    Payload: string
-}
 
-type XssPayloadGroup = {
-    [<JsonProperty(Required = Required.Default)>]
-    Regex: string
-    [<JsonProperty(Required = Required.Always)>]
-    Payloads: XssPayload[]
-}
 
 type Config = {
     [<JsonProperty(Required = Required.Always)>]
@@ -33,7 +21,7 @@ type Config = {
     [<JsonProperty(Required = Required.Always)>]
     JsBodyFilter: bool
     [<JsonProperty(Required = Required.Always)>]
-    Payloads: XssPayloadGroup[]
+    Payloads: XssPayload.Group[]
 }
 
 let read filename =

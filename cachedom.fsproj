@@ -12,6 +12,7 @@
     <Compile Include="Proxy.fs" />
     <Compile Include="HttpCache.fs" />
     <Compile Include="ProxyHandler.fs" />
+    <Compile Include="XssPayload.fs" />
     <Compile Include="Config.fs" />
     <Compile Include="Browser.fs" />
     <Compile Include="Check.fs" />

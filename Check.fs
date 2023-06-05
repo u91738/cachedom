@@ -4,6 +4,7 @@ open System
 open System.Linq
 open System.Text.RegularExpressions
 open OpenQA.Selenium
+open XssPayload
 
 type private Mul = Id | Prefix | Postfix
 module private Mul =
@@ -34,7 +35,7 @@ type ResultType = Exec of Uri | Refl of (Uri * Charset * ReflType)[]
 type Context = {
     Browser: IWebDriver
     Cache: HttpCache.HttpCache
-    Payloads: Config.XssPayloadGroup[]
+    Payloads: XssPayload.Group[]
     WaitAfterNavigation: int
 }
 
@@ -44,46 +45,23 @@ let private invContains (where:string) (what:string) =
 let private invEq (a:string) (b:string) =
     a.Equals(b, StringComparison.OrdinalIgnoreCase)
 
-let private consoleMsgEq log msg =
-    [| "console-api [:0-9]* \"(.*)\""; "console-api [:0-9]* (.*)" |]
-    |> Array.exists (fun rex ->
-        let lm = Regex.Match(log, rex)
-        lm.Groups.Count > 1 && invEq lm.Groups[1].Value msg
-    )
-
 let private hasLog (browser:IWebDriver) value =
-    browser.Manage().Logs.GetLog "browser"
-    |> Seq.exists (fun log -> consoleMsgEq log.Message value)
+    Browser.consoleLog browser |> Seq.exists (invEq value)
 
-let private getReflected (browser:IWebDriver) value =
+let private checkReflected ctx url input mul value =
+    use inpCtx = Browser.Inputs.apply ctx.Browser url ctx.WaitAfterNavigation input (Mul.apply mul value)
     [|
-        if hasLog browser value then
-            yield Log
-        if invContains browser.PageSource value then
-            yield Body
+        if hasLog ctx.Browser value then
+            yield inpCtx.Data, Log
+        if invContains ctx.Browser.PageSource value then
+            yield inpCtx.Data, Body
 
-        for c in browser.Manage().Cookies.AllCookies do
+        for c in ctx.Browser.Manage().Cookies.AllCookies do
             if invContains c.Name value || invContains c.Value value then
-                yield Cookie (c.Name, c.Value)
+                yield inpCtx.Data, Cookie (c.Name, c.Value)
     |]
 
-let private checkReflected ctx url input mul searchKey =
-    use inpCtx = Browser.Inputs.apply ctx.Browser url ctx.WaitAfterNavigation input (Mul.apply mul searchKey)
-    getReflected ctx.Browser searchKey |> Array.map (fun i -> inpCtx.Data, i)
-
-let private matchExists regexPattern (strings: string[]) =
-    let rex = Regex(regexPattern)
-    strings |> Array.exists rex.IsMatch
-
-let private filterPayloads cache (payloads:Config.XssPayloadGroup[]) =
-    let recentResps = HttpCache.getRecentResponses cache |> Array.map (fun i -> i.BodyString)
-    [|
-        for grp in payloads do
-            if String.IsNullOrEmpty grp.Regex || matchExists grp.Regex recentResps then
-                yield! grp.Payloads
-    |]
-
-let private tryPayload ctx url input mul (pl:Config.XssPayload) =
+let private tryPayload ctx url input mul pl =
     use inpCtx = Browser.Inputs.apply ctx.Browser url ctx.WaitAfterNavigation input (Mul.apply mul pl.Payload)
     if hasLog ctx.Browser pl.Msg then
         Some inpCtx.Data
@@ -132,7 +110,9 @@ let private checkInput ctx url input =
                     Mul.all
 
     let exec =
-        filterPayloads ctx.Cache ctx.Payloads
+        HttpCache.getRecentResponses ctx.Cache
+        |> Array.map (fun i -> i.BodyString)
+        |> XssPayload.Group.filter ctx.Payloads
         |> Array.allPairs muls
         |> Array.tryPick (fun (mul, pl) -> tryPayload ctx url input mul pl)
 

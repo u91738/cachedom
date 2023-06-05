@@ -2,7 +2,6 @@ module Check
 
 open System
 open System.Linq
-open System.Collections.Generic
 open System.Text.RegularExpressions
 open OpenQA.Selenium
 
@@ -30,7 +29,7 @@ module Charset =
 
 type ReflType = Body | Cookie of string*string | Log
 
-type ResultType = Exec of Uri | Refl of (Charset * ReflType)[]
+type ResultType = Exec of Uri | Refl of (Uri * Charset * ReflType)[]
 
 type Context = {
     Browser: IWebDriver
@@ -68,9 +67,9 @@ let private getReflected (browser:IWebDriver) value =
                 yield Cookie (c.Name, c.Value)
     |]
 
-let private checkReflected ctx refresh url searchKey =
-    Browser.navigate ctx.Browser refresh url ctx.WaitAfterNavigation
-    getReflected ctx.Browser searchKey
+let private checkReflected ctx url input mul searchKey =
+    use inpCtx = Browser.Inputs.apply ctx.Browser url ctx.WaitAfterNavigation input (Mul.apply mul searchKey)
+    getReflected ctx.Browser searchKey |> Array.map (fun i -> inpCtx.Data, i)
 
 let private matchExists regexPattern (strings: string[]) =
     let rex = Regex(regexPattern)
@@ -85,17 +84,15 @@ let private filterPayloads cache (payloads:Config.XssPayloadGroup[]) =
     |]
 
 let private tryPayload ctx url input mul (pl:Config.XssPayload) =
-    let plUrl = Url.Inputs.map url (Mul.apply mul pl.Payload) input
-    Browser.navigate ctx.Browser input.IsFragment plUrl ctx.WaitAfterNavigation
+    use inpCtx = Browser.Inputs.apply ctx.Browser url ctx.WaitAfterNavigation input (Mul.apply mul pl.Payload)
     if hasLog ctx.Browser pl.Msg then
-        Some plUrl
+        Some inpCtx.Data
     else
         None
 
 type CharsetRefl = {
     Sample: string
-    Url: Uri
-    Refl: Lazy<ReflType[]>
+    Refl: Lazy<(Uri*ReflType)[]>
 }
 
 let private getCommonReflections ctx url input =
@@ -103,11 +100,9 @@ let private getCommonReflections ctx url input =
         for mul in Mul.all do
             mul, [|
                 for cs, sample in Charset.samples do
-                    let csUrl = Url.Inputs.map url (Mul.apply mul sample) input
                     cs, {
                         Sample = sample
-                        Url = csUrl
-                        Refl = lazy checkReflected ctx input.IsFragment csUrl sample
+                        Refl = lazy checkReflected ctx url input mul sample
                     }
             |] |> Map.ofArray
     |] |> Map.ofArray
@@ -124,7 +119,8 @@ let private canHaveJs cache =
 
 type PayloadFilter = Filter | Brute
 
-let private checkJsInput ctx url input (charsets:Map<Mul, Map<Charset, CharsetRefl>>) =
+let private checkInput ctx url input =
+    let charsets = getCommonReflections ctx url input
     let idCs = Set.ofArray [|
         for i in charsets[Id] do
             if Charset.common.Contains i.Key && i.Value.Refl.Value.Any() then
@@ -146,20 +142,14 @@ let private checkJsInput ctx url input (charsets:Map<Mul, Map<Charset, CharsetRe
         for mul in muls do
             for cs in charsets[mul] do
                 if cs.Value.Refl.Value.Any() then
-                    input, Refl (Array.map (fun r -> (cs.Key, r)) cs.Value.Refl.Value)
+                    input, Refl (Array.map (fun (u, r) -> (u, cs.Key, r)) cs.Value.Refl.Value)
     |]
 
-let private checkInput ctx mode url input =
-    let charsets = getCommonReflections ctx url input
-    match mode with
-    | Brute -> checkJsInput ctx url input charsets
-    | Filter ->
-        charsets[Id].[Numeric].Refl.Force() |> ignore
-        if canHaveJs ctx.Cache then
-            checkJsInput ctx url input charsets
-        else
-            [| |]
-
 let url ctx mode url =
+    Browser.navigate ctx.Browser false (Uri "about:blank") 0
     HttpCache.clearRecent ctx.Cache
-    Url.Inputs.get url |> Array.collect (checkInput ctx mode url)
+    Browser.navigate ctx.Browser false url ctx.WaitAfterNavigation
+    let inputs = Browser.Inputs.get ctx.Browser
+    match mode with
+    | Brute | Filter when canHaveJs ctx.Cache -> Array.collect (checkInput ctx url) inputs
+    | _ -> [| |]

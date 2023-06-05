@@ -56,19 +56,19 @@ let execOnly r = Array.length r > 0 && Array.forall isExec r
 
 let reflOnly r = Array.length r > 0 && Array.forall (isExec >> not) r
 
-let hasFragExec (r: (Url.Inputs.Input*_)[]) =
+let hasFragExec (r: (Browser.Inputs.Input*_)[]) =
     r |> Array.exists (function
                        | i, Exec (_) when i.IsFragment -> true
                        | _ -> false)
 
-let hasArgExec (r: (Url.Inputs.Input*_)[]) =
+let hasArgExec (r: (Browser.Inputs.Input*_)[]) =
     r |> Array.exists (function
-                     | i, Exec (_) when not i.IsFragment -> true
+                     | i, Exec (_) when i.IsArg -> true
                      | _ -> false)
 
-let hasCharset r cs =
+let hasCharset r (cs, t) =
     Array.exists (function
-                  | _, Refl refl -> Array.contains cs refl
+                  | _, Refl refl -> Array.exists (fun (_, rcs, rt) -> rcs = cs && rt = t) refl
                   | _ -> false) r
 
 let noCharset r cs = not (hasCharset r cs)

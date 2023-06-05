@@ -65,8 +65,9 @@ let rec private parseArgs args urls conf =
 
 let private typeDesc t =
     match t with
-    | Url.Inputs.Fragment -> "Url #fragment"
-    | Url.Inputs.Arg arg -> sprintf "GET parameter %d" arg
+    | Browser.Inputs.Fragment -> "Url #fragment"
+    | Browser.Inputs.Arg arg -> sprintf "GET parameter %d" arg
+    | Browser.Inputs.Cookie c -> sprintf "Cookie %s = %s" c.Name c.Value
 
 let private withColor c f =
     let old = Console.ForegroundColor
@@ -80,9 +81,9 @@ let private urlReport input res =
         printfn "%s leads to JS execution in Url:" (typeDesc input)
         withColor ConsoleColor.Yellow (fun () -> printfn "%s" (string value))
     | Refl refl ->
-        for k, v in Array.groupBy snd refl do
+        for k, v in Array.groupBy (fun (_, _, i) -> i) refl do
             printfn "%A charsets:" k
-            let charsets = v |> Array.map fst
+            let charsets = v |> Array.map (fun (_, i, _) -> i)
             let cstext = [|
                 if Array.contains Lower charsets then
                     yield "Lower"

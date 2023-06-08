@@ -32,11 +32,15 @@ type ReflType = Body | Cookie of string*string | Log
 
 type ResultType = Exec of Uri | Refl of (Uri * Charset * ReflType)[]
 
+type PayloadFilter = Filter | Brute
+
 type Context = {
     Browser: IWebDriver
     Cache: HttpCache.HttpCache
     Payloads: XssPayload.Group[]
     WaitAfterNavigation: int
+    FilterMode: PayloadFilter
+    InputKinds: list<Browser.Inputs.Kind>
 }
 
 let private invContains (where:string) (what:string) =
@@ -95,8 +99,6 @@ let private canHaveJs cache =
         jsBodyRegex.IsMatch i.Value.BodyString
     )
 
-type PayloadFilter = Filter | Brute
-
 let private checkInput ctx url input =
     let charsets = getCommonReflections ctx url input
     let idCs = Set.ofArray [|
@@ -125,11 +127,11 @@ let private checkInput ctx url input =
                     input, Refl (Array.map (fun (u, r) -> (u, cs.Key, r)) cs.Value.Refl.Value)
     |]
 
-let url ctx mode url =
+let url ctx url =
     Browser.navigate ctx.Browser false (Uri "about:blank") 0
     HttpCache.clearRecent ctx.Cache
     Browser.navigate ctx.Browser false url ctx.WaitAfterNavigation
-    let inputs = Browser.Inputs.get ctx.Browser
-    match mode with
+    let inputs = Browser.Inputs.get ctx.Browser ctx.InputKinds
+    match ctx.FilterMode with
     | Brute | Filter when canHaveJs ctx.Cache -> Array.collect (checkInput ctx url) inputs
     | _ -> [| |]

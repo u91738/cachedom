@@ -80,7 +80,7 @@ module Cookie =
                     cookies.AddCookie oldCookie
 
 module Inputs =
-    [<DefaultAugmentationAttribute(false)>]
+    [<DefaultAugmentation(false)>]
     type Input = Arg of int | Fragment | Cookie of Cookie
     with
         member this.IsFragment =
@@ -98,14 +98,16 @@ module Inputs =
             | Cookie _ -> true
             | _ -> false
 
-    let get (browser:IWebDriver) =
-        [|
-            for i in 0 .. Url.Args.count (Uri browser.Url) - 1 do
-                Arg i
-            for c in Cookie.all browser do
-                Cookie c
-            Fragment
-        |]
+    [<RequireQualifiedAccess>]
+    type Kind = Arg | Fragment | Cookie
+
+    let get (browser:IWebDriver) kinds =
+        kinds
+        |> Seq.collect (function
+            | Kind.Arg -> Array.init (Url.Args.count (Uri browser.Url)) Arg
+            | Kind.Cookie -> Cookie.all browser |> Array.map Cookie
+            | Kind.Fragment -> [| Fragment |])
+        |> Seq.toArray
 
     let apply browser uri waitAfter input transform =
         let navUri = match input with

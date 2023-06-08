@@ -19,6 +19,8 @@ OPTIONS
     only check pages if they have on...=, javascript, <script etc in their body
 --show-browser
     do not run browser in headless mode, mostly a debug feature
+--ignore-cookies
+    do not try to put payloads into cookies. Can save a lot of time.
 --cache-mode [precise|strip-arg-values|strip-arg-names-values]
     precise
         respond from cache to requests that fully match previous request in cache
@@ -60,6 +62,8 @@ let rec private parseArgs args urls conf =
         parseArgs tail urls {conf with JsBodyFilter = true }
     | "--no-js-body-filter" :: tail ->
         parseArgs tail urls {conf with JsBodyFilter = false }
+    | "--ignore-cookies" :: tail ->
+        parseArgs tail urls {conf with IgnoreCookies = true }
     | [] -> Some (urls, conf)
     | _ -> failwith "Failed to parse arguments"
 
@@ -113,8 +117,14 @@ let main argv =
             Cache = cache
             Payloads = conf.Payloads
             WaitAfterNavigation = conf.WaitAfterNavigation
+            FilterMode = if conf.JsBodyFilter then Filter else Brute
+            InputKinds = [
+                Browser.Inputs.Kind.Arg
+                Browser.Inputs.Kind.Fragment
+                if not conf.IgnoreCookies then
+                    Browser.Inputs.Kind.Cookie
+            ]
         }
-        let filterMode = if conf.JsBodyFilter then Filter else Brute
 
         printfn "------------------------------------------------------------"
         for url in urls do
@@ -125,10 +135,10 @@ let main argv =
                     let method, cachedUrl = cached.Key
                     if method = "GET" && cached.Value.HeaderText.Contains("text/html", StringComparison.InvariantCultureIgnoreCase) then
                         printfn "Check url: %s" (string cachedUrl)
-                        for input, res in Check.url ctx filterMode (Uri cachedUrl) do
+                        for input, res in Check.url ctx (Uri cachedUrl) do
                             urlReport input res
             else
                 printfn "Check url: %s" (string url)
-                for input, res in Check.url ctx filterMode url do
+                for input, res in Check.url ctx url do
                     urlReport input res
         0

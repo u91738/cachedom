@@ -34,7 +34,9 @@ type BrowserFixture() =
         Browser = browser
         Cache = cache
         Payloads = conf.Payloads
-        WaitAfterNavigation = 110
+        WaitAfterNavigation = 0
+        FilterMode = Filter
+        InputKinds = [ Browser.Inputs.Kind.Arg; Browser.Inputs.Kind.Fragment ]
     }
 
     with
@@ -80,49 +82,49 @@ type Tests(ctx:BrowserFixture, srv:ServerFixture) =
     [<Fact>]
     member _.``Param write``() =
         let url = Uri $"http://{localhost}:8000/arg-write.html?a=123"
-        let r = Check.url ctx.Ctx Filter url
+        let r = Check.url ctx.Ctx url
         test <@ execOnly r  @>
         test <@ hasArgExec r  @>
 
     [<Fact>]
     member _.``Angular frag write``() =
         let url = Uri $"http://{localhost}:8000/angular.html"
-        let r = Check.url ctx.Ctx Filter url
+        let r = Check.url ctx.Ctx url
         test <@ execOnly r  @>
         test <@ hasFragExec r  @>
 
     [<Fact>]
     member _.``Vue2 frag``() =
         let url = Uri $"http://{localhost}:8000/vue2.html"
-        let r = Check.url ctx.Ctx Filter url
+        let r = Check.url ctx.Ctx url
         test <@ execOnly r  @>
         test <@ hasFragExec r  @>
 
     [<Fact>]
     member _.``Vue3 components``() =
         let url = Uri $"http://{localhost}:8000/vue3-comp.html"
-        let r = Check.url ctx.Ctx Filter url
+        let r = Check.url ctx.Ctx url
         test <@ execOnly r  @>
         test <@ hasFragExec r  @>
 
     [<Fact>]
     member _.``Vue2 components``() =
         let url = Uri $"http://{localhost}:8000/vue2-comp.html"
-        let r = Check.url ctx.Ctx Filter url
+        let r = Check.url ctx.Ctx url
         test <@ execOnly r  @>
         test <@ hasFragExec r  @>
 
     [<Fact>]
     member _.``Vue3 frag``() =
         let url = Uri $"http://{localhost}:8000/vue3.html"
-        let r = Check.url ctx.Ctx Filter url
+        let r = Check.url ctx.Ctx url
         test <@ execOnly r  @>
         test <@ hasFragExec r  @>
 
     [<Fact>]
     member _.``Fragment eval``() =
         let url = Uri $"http://{localhost}:8000/frag-eval.html?a=123"
-        let r = Check.url ctx.Ctx Filter url
+        let r = Check.url ctx.Ctx url
         test <@ execOnly r  @>
         test <@ hasFragExec r  @>
 
@@ -130,14 +132,14 @@ type Tests(ctx:BrowserFixture, srv:ServerFixture) =
     member _.``Fragment setTimeout``() =
         let url = Uri $"http://{localhost}:8000/frag-timeout.html?a=123"
         let c = { ctx.Ctx with WaitAfterNavigation = Config.Default.WaitAfterNavigation }
-        let r = Check.url c Filter url
+        let r = Check.url c url
         test <@ execOnly r  @>
         test <@ hasFragExec r  @>
 
     [<Fact>]
     member _.``Param write alnum``() =
         let url = Uri $"http://{localhost}:8000/arg-write-alnum.html?a=123"
-        let r = Check.url ctx.Ctx Filter url
+        let r = Check.url ctx.Ctx url
         test <@ reflOnly r @>
         test <@ hasCharset r (Lower, Body) @>
         test <@ hasCharset r (Upper, Body) @>
@@ -148,7 +150,7 @@ type Tests(ctx:BrowserFixture, srv:ServerFixture) =
     [<Fact>]
     member _.``Arg alpha-paren``() =
         let url = Uri $"http://{localhost}:8000/arg-alpha-paren.html?a=123"
-        let r = Check.url ctx.Ctx Filter url
+        let r = Check.url ctx.Ctx url
 
         test <@ reflOnly r @>
         test <@ hasCharset r (Lower, Body) @>
@@ -163,36 +165,38 @@ type Tests(ctx:BrowserFixture, srv:ServerFixture) =
     [<Fact>]
     member _.``Arg alpha-paren-br-bt``() =
         let url = Uri $"http://{localhost}:8000/arg-alpha-dot-bt.html?a=123"
-        let r = Check.url ctx.Ctx Filter url
+        let r = Check.url ctx.Ctx url
         test <@ execOnly r  @>
         test <@ hasArgExec r  @>
 
     [<Fact>]
     member _.``No arg static``() =
         let url = Uri $"http://{localhost}:8000/static.html"
-        let r = Check.url ctx.Ctx Filter url
+        let r = Check.url ctx.Ctx url
         test <@ r.Length = 0  @>
 
     [<Fact>]
     member _.``No arg boring js``() =
         let url = Uri $"http://{localhost}:8000/boring-js.html"
-        let r = Check.url ctx.Ctx Filter url
+        let r = Check.url ctx.Ctx url
         test <@ r.Length = 0  @>
 
     [<Fact>]
     member _.``Arg boring js``() =
         let url = Uri $"http://{localhost}:8000/boring-js.html?a=123"
-        let r = Check.url ctx.Ctx Filter url
+        let r = Check.url ctx.Ctx url
         test <@ r.Length = 0  @>
 
     [<Fact>]
     member _.``Arg cookie refl``() =
         let url = Uri $"http://{localhost}:8000/arg-cookie-refl.html?a=123"
-        let r = Check.url ctx.Ctx Filter url
+        let c = { ctx.Ctx with InputKinds = Browser.Inputs.Kind.Cookie :: ctx.Ctx.InputKinds }
+        let r = Check.url c url
         test <@ reflOnly r @>
 
     [<Fact>]
     member _.``Arg cookie exec``() =
         let url = Uri $"http://{localhost}:8000/arg-cookie-exec.html?a=123"
-        let r = Check.url ctx.Ctx Filter url
+        let c = { ctx.Ctx with InputKinds = Browser.Inputs.Kind.Cookie :: ctx.Ctx.InputKinds }
+        let r = Check.url c url
         test <@ execOnly r @>

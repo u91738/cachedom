@@ -21,6 +21,8 @@ type Config = {
     [<JsonProperty(Required = Required.Always)>]
     JsBodyFilter: bool
     [<JsonProperty(Required = Required.Always)>]
+    IgnoreCookies:bool
+    [<JsonProperty(Required = Required.Always)>]
     Payloads: XssPayload.Group[]
 }
 

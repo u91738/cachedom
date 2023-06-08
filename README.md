@@ -27,6 +27,8 @@ OPTIONS
     only check pages if they have on...=, javascript, <script etc in their body
 --show-browser
     do not run browser in headless mode, mostly a debug feature
+--ignore-cookies
+    do not try to put payloads into cookies. Can save a lot of time.
 --cache-mode [precise|strip-arg-values|strip-arg-names-values]
     precise
         respond from cache to requests that fully match previous request in cache

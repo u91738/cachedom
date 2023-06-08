@@ -6,6 +6,7 @@
     "CacheMode" : {"Case" : "StripArgValues" },
     "WaitAfterNavigation" : 50,
     "JsBodyFilter" : true,
+    "IgnoreCookies" : false,
     "Payloads" : [
         {
             "Regex": null,

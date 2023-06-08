@@ -184,3 +184,15 @@ type Tests(ctx:BrowserFixture, srv:ServerFixture) =
         let url = Uri $"http://{localhost}:8000/boring-js.html?a=123"
         let r = Check.url ctx.Ctx Filter url
         test <@ r.Length = 0  @>
+
+    [<Fact>]
+    member _.``Arg cookie refl``() =
+        let url = Uri $"http://{localhost}:8000/arg-cookie-refl.html?a=123"
+        let r = Check.url ctx.Ctx Filter url
+        test <@ reflOnly r @>
+
+    [<Fact>]
+    member _.``Arg cookie exec``() =
+        let url = Uri $"http://{localhost}:8000/arg-cookie-exec.html?a=123"
+        let r = Check.url ctx.Ctx Filter url
+        test <@ execOnly r @>

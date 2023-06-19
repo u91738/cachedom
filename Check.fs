@@ -28,7 +28,10 @@ module Charset =
                 Special i, sprintf "test%ctest" i
         |]
 
-type ReflType = Body | Cookie of string*string | Log
+type ReflType = Body
+              | Cookie of string * string
+              | Log
+              | Instr of string * JsInstrumentation.InstrumentationRecord
 
 type ResultType = Exec of Uri | Refl of (Uri * Charset * ReflType)[]
 
@@ -37,6 +40,7 @@ type PayloadFilter = Filter | Brute
 type Context = {
     Browser: IWebDriver
     Cache: HttpCache.HttpCache
+    JsInstr: JsInstrumentation.Sync.Instrumentation
     Payloads: XssPayload.Group[]
     WaitAfterNavigation: int
     FilterMode: PayloadFilter
@@ -53,6 +57,7 @@ let private hasLog (browser:IWebDriver) value =
     Browser.consoleLog browser |> Seq.exists (invEq value)
 
 let private checkReflected ctx url input mul value =
+    use _ = JsInstrumentation.Sync.withEnabled ctx.JsInstr true
     use inpCtx = Browser.Inputs.apply ctx.Browser url ctx.WaitAfterNavigation input (Mul.apply mul value)
     [|
         if hasLog ctx.Browser value then
@@ -63,9 +68,15 @@ let private checkReflected ctx url input mul value =
         for c in ctx.Browser.Manage().Cookies.AllCookies do
             if invContains c.Name value || invContains c.Value value then
                 yield inpCtx.Data, Cookie (c.Name, c.Value)
+
+        for call in JsInstrumentation.Sync.get ctx.JsInstr (Browser.execDefault ctx.Browser) do
+            for case in call.Value do
+                if case.Args |> Array.exists (fun i -> invContains i value) then
+                    yield inpCtx.Data, Instr (call.Key, case)
     |]
 
 let private tryPayload ctx url input mul pl =
+    use _ = JsInstrumentation.Sync.withEnabled ctx.JsInstr false
     use inpCtx = Browser.Inputs.apply ctx.Browser url ctx.WaitAfterNavigation input (Mul.apply mul pl.Payload)
     if hasLog ctx.Browser pl.Msg then
         Some inpCtx.Data
@@ -89,15 +100,11 @@ let private getCommonReflections ctx url input =
             |] |> Map.ofArray
     |] |> Map.ofArray
 
-
-let private jsBodyRegex = Regex("javascript|<script|on[a-z0-9_\\-]*=|<svg", RegexOptions.IgnoreCase ||| RegexOptions.CultureInvariant)
-
 let private canHaveJs cache =
     HttpCache.getAll cache
     |> Array.exists (fun i ->
         (fst i.Key).Equals("get", StringComparison.InvariantCultureIgnoreCase) &&
-        jsBodyRegex.IsMatch i.Value.BodyString
-    )
+        JsInstrumentation.canHaveJs i.Value.BodyString)
 
 let private checkInput ctx url input =
     let charsets = getCommonReflections ctx url input

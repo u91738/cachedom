@@ -109,12 +109,14 @@ let main argv =
     | None -> 1
     | Some (urls, conf) ->
         let cache = HttpCache.empty conf.CacheMode
-        use _ = Proxy.start (ProxyHandler.onRequest false cache) (ProxyHandler.onResponse cache) conf.ProxyPort
+        let instr = JsInstrumentation.Sync.create false
+        use _ = Proxy.start (ProxyHandler.onRequest false cache instr) (ProxyHandler.onResponse cache instr) conf.ProxyPort
         let selproxy = Proxy.selenium "localhost" conf.ProxyPort
         use browser = Browser.get selproxy (not conf.ShowBrowser) conf.UserAgent
         let ctx = {
             Browser = browser
             Cache = cache
+            JsInstr = instr
             Payloads = conf.Payloads
             WaitAfterNavigation = conf.WaitAfterNavigation
             FilterMode = if conf.JsBodyFilter then Filter else Brute

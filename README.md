@@ -8,8 +8,8 @@ in hope of finding a DOM XSS vulnerability with minimal load on the server.
 If new parameters make the page create network requests that are not in cache - they will go to the server.
 
 For more options
-```shell
-cachedom --help
+```
+$ cachedom --help
 cachedom - search for DOM XSS with limited interaction with server
 Usage:
     cachedom --url http://example.com?a=123\n\

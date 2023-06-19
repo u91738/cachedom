@@ -1,0 +1,1 @@
+return JSON.stringify(typeof script_instrumentation_result === 'undefined' ? null : script_instrumentation_result)

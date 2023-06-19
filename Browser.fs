@@ -57,6 +57,14 @@ let consoleLog (browser:IWebDriver) =
         | _ -> None
     )
 
+let exec (browser:IWebDriver) (js:string) =
+    (browser :?> IJavaScriptExecutor).ExecuteScript js |> string
+
+let execDefault browser js =
+    try
+        exec browser js
+    with :? JavaScriptException as e -> ""
+
 module Cookie =
     let all (browser:IWebDriver) =
         browser.Manage().Cookies.AllCookies |> Seq.toArray

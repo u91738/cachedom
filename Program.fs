@@ -101,8 +101,8 @@ let private urlReport input res =
 
             for url, cs, r in v do
                 match r with
-                | Log | Body -> printfn "    %s %A" (charsetToString cs) url
-                | Cookie (name, value) -> printfn "    %s %A ( \"%s\" = \"%s\" )" (charsetToString cs) url name value
+                | Log | Body -> printfn "    %s %A\n" (charsetToString cs) url
+                | Cookie (name, value) -> printfn "    %s %A ( \"%s\" = \"%s\" )\n" (charsetToString cs) url name value
                 | Instr (name, ctx) ->
                     let stack = String.Join('\n', ctx.Stack.Split('\n') |> Array.map (fun i -> "    " + i))
                     let args = String.Join(',', ctx.Args)

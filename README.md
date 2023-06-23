@@ -62,6 +62,7 @@ $ cachedom --url http://10.0.0.1:8000/arg-write-alnum.html?a=1
 Check url: http://10.0.0.1:8000/arg-write-alnum.html?a=1
 Body:
     Lower http://10.0.0.1:8000/arg-write-alnum.html?a=abctestcba
+
 Instr document_write:
     Lower http://10.0.0.1:8000/arg-write-alnum.html?a=abctestcba
     call: document_write ( abctestcba )
@@ -73,6 +74,7 @@ exception stack:
 
 Body:
     Upper http://10.0.0.1:8000/arg-write-alnum.html?a=ABCTESTCBA
+
 Instr document_write:
     Upper http://10.0.0.1:8000/arg-write-alnum.html?a=ABCTESTCBA
     call: document_write ( ABCTESTCBA )
@@ -84,6 +86,7 @@ exception stack:
 
 Body:
     Numeric http://10.0.0.1:8000/arg-write-alnum.html?a=321123
+
 Instr document_write:
     Numeric http://10.0.0.1:8000/arg-write-alnum.html?a=321123
     call: document_write ( 321123 )

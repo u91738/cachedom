@@ -79,29 +79,36 @@ let private withColor c f =
     f()
     Console.ForegroundColor <- c
 
+let private charsetToString = function
+    | Special c -> sprintf "\"%c\"" c
+    | cs -> string cs
+
 let private urlReport input res =
     match res with
     | Exec value ->
         printfn "%s leads to JS execution in Url:" (typeDesc input)
         withColor ConsoleColor.Yellow (fun () -> printfn "%s" (string value))
     | Refl refl ->
-        for k, v in Array.groupBy (fun (_, _, i) -> i) refl do
-            printfn "%A charsets:" k
-            let charsets = v |> Array.map (fun (_, i, _) -> i)
-            let cstext = [|
-                if Array.contains Lower charsets then
-                    yield "Lower"
-                if Array.contains Upper charsets then
-                    yield "Upper"
-                if Array.contains Numeric charsets then
-                    yield "Numeric"
+        let getReflKey (_, _, r) =
+            match r with
+            | Body -> "Body"
+            | Log -> "Log"
+            | Cookie (name, _) -> sprintf "Cookie %s" name
+            | Instr (name, _)  -> sprintf "Instr %s" name
 
-                let special = new String(Array.choose (function | Special c -> Some c | _ -> None) charsets)
-                if special.Length > 0 then
-                    yield sprintf "\"%s\"" special
-            |]
+        for k, v in Array.groupBy getReflKey refl do
+            printfn "%s:" k
 
-            printfn "%s" (String.Join(", ", cstext))
+            for url, cs, r in v do
+                match r with
+                | Log | Body -> printfn "    %s %A" (charsetToString cs) url
+                | Cookie (name, value) -> printfn "    %s %A ( \"%s\" = \"%s\" )" (charsetToString cs) url name value
+                | Instr (name, ctx) ->
+                    let stack = String.Join('\n', ctx.Stack.Split('\n') |> Array.map (fun i -> "    " + i))
+                    let args = String.Join(',', ctx.Args)
+                    printfn "    %s %A" (charsetToString cs) url
+                    printfn "    call: %s ( %s )" name args
+                    printfn "exception stack:\n%s\n" stack
 
 [<EntryPoint>]
 let main argv =

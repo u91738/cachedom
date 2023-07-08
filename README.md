@@ -1,13 +1,18 @@
 # cachedom
-Tool to look for DOM XSS with lots of caching and minimal server load.
+Tool to look for DOM XSS with no/minimal server load.
 
-running as `cachedom --url http://example.com?a=123` will make cachedom go to `http://example.com?a=123`, cache every HTTP request,
+Running as `cachedom --url http://example.com?a=123` will make cachedom go to `http://example.com?a=123`, cache every HTTP request,
 then try XSS payloads in parameters found in url (`a=...`) and url fragment (`http://example.com?a=123#...`)
 in hope of finding a DOM XSS vulnerability with minimal load on the server.
+Adding `--warc example.warc` will use example.warc as an extra source for cache contents.
 
 If new parameters make the page create network requests that are not in cache - they will go to the server.
 
 If no payloads in config file cause js execution, will check what charsets from argument will get into page body, cookies, log or js calls like write and eval.
+
+`cachedom --warc example.warc --cache-fail not-found --url http://example.com?a=123`
+Will use example.warc as the only source of HTTP responses, no contact with real HTTP server of example.com.
+Requests not found in example.warc will get HTTP 404 stub.
 
 For more options
 ```

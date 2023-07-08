@@ -2,6 +2,8 @@ module ProxyHandler
 
 open Titanium.Web.Proxy.EventArguments
 
+type NoCache = Ok | NotFound | PassToNetwork
+
 let private blockHosts = [|
     "accounts.google.com"
     ".googleapis.com"
@@ -9,7 +11,7 @@ let private blockHosts = [|
     ".gvt1.com"
 |]
 
-let onRequest verbose (cache:HttpCache.ICache) instr (e: SessionEventArgs) =
+let onRequest verbose failMode (cache:HttpCache.ICache) instr (e: SessionEventArgs) =
     task {
         try
             if blockHosts |> Array.exists e.HttpClient.Request.RequestUri.Host.Contains then
@@ -25,8 +27,18 @@ let onRequest verbose (cache:HttpCache.ICache) instr (e: SessionEventArgs) =
                         instrBody |> resp.Encoding.GetBytes |> Http.withBody resp |> e.Respond
                     | None -> e.Respond resp
                 | None ->
-                    if verbose then
-                        printfn "Pass to network %s %s" e.HttpClient.Request.Method e.HttpClient.Request.Url
+                    match failMode with
+                    | Ok ->
+                        if verbose then
+                            printfn "Dummy response to %s %s" e.HttpClient.Request.Method e.HttpClient.Request.Url
+                        e.Respond Http.ok
+                    | NotFound ->
+                        if verbose then
+                            printfn "Dummy response to %s %s" e.HttpClient.Request.Method e.HttpClient.Request.Url
+                        e.Respond Http.notFound
+                    | PassToNetwork ->
+                        if verbose then
+                            printfn "Pass to network %s %s" e.HttpClient.Request.Method e.HttpClient.Request.Url
         with e -> eprintfn "onRequest exception\n%A" e
     }
 

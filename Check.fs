@@ -58,29 +58,29 @@ let private hasLog (browser:IWebDriver) value =
 let private checkReflected ctx url input mul value =
     use _ = JsInstrumentation.Sync.withEnabled ctx.JsInstr true
     use inpCtx = Browser.Inputs.apply ctx.Browser url ctx.WaitAfterNavigation input (Mul.apply mul value)
-    [|
-        if hasLog ctx.Browser value then
-            yield inpCtx.Data, Log
-        if invContains ctx.Browser.PageSource value then
-            yield inpCtx.Data, Body
+    match inpCtx.Data with
+    | Some url ->
+        [|
+            if hasLog ctx.Browser value then
+                yield url, Log
+            if invContains ctx.Browser.PageSource value then
+                yield url, Body
 
-        for c in ctx.Browser.Manage().Cookies.AllCookies do
-            if invContains c.Name value || invContains c.Value value then
-                yield inpCtx.Data, Cookie (c.Name, c.Value)
+            for c in ctx.Browser.Manage().Cookies.AllCookies do
+                if invContains c.Name value || invContains c.Value value then
+                    yield url, Cookie (c.Name, c.Value)
 
-        for call in JsInstrumentation.Sync.get ctx.JsInstr (Browser.execDefault ctx.Browser) do
-            for case in call.Value do
-                if case.Args |> Array.exists (fun i -> invContains i value) then
-                    yield inpCtx.Data, Instr (call.Key, case)
-    |]
+            for call in JsInstrumentation.Sync.get ctx.JsInstr (Browser.execDefault ctx.Browser) do
+                for case in call.Value do
+                    if case.Args |> Array.exists (fun i -> invContains i value) then
+                        yield url, Instr (call.Key, case)
+        |]
+    | None -> [| |]
 
 let private tryPayload ctx url input mul pl =
     use _ = JsInstrumentation.Sync.withEnabled ctx.JsInstr false
     use inpCtx = Browser.Inputs.apply ctx.Browser url ctx.WaitAfterNavigation input (Mul.apply mul pl.Payload)
-    if hasLog ctx.Browser pl.Msg then
-        Some inpCtx.Data
-    else
-        None
+    inpCtx.Data |> Option.bind (fun url -> if hasLog ctx.Browser pl.Msg then Some url else None)
 
 type CharsetRefl = {
     Sample: string
@@ -135,9 +135,11 @@ let private checkInput ctx url input =
     |]
 
 let url ctx url =
-    Browser.navigate ctx.Browser false (Uri "about:blank") 0
-    Browser.navigate ctx.Browser false url ctx.WaitAfterNavigation
-    let inputs = Browser.Inputs.get ctx.Browser ctx.InputKinds
-    match ctx.FilterMode with
-    | Brute | Filter when canHaveJs ctx.Cache -> Array.collect (checkInput ctx url) inputs
-    | _ -> [| |]
+    Browser.navigate ctx.Browser false (Uri "about:blank") 0 |> ignore
+    if Browser.navigate ctx.Browser false url ctx.WaitAfterNavigation then
+        let inputs = Browser.Inputs.get ctx.Browser ctx.InputKinds
+        match ctx.FilterMode with
+        | Brute | Filter when canHaveJs ctx.Cache -> Array.collect (checkInput ctx url) inputs
+        | _ -> [| |]
+    else
+        failwithf "Failed to navigate to %A" url

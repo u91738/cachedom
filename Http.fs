@@ -4,10 +4,17 @@ open System
 open System.Text
 open Titanium.Web.Proxy.Http
 
-let notFound =
-    let r = Response()
-    r.StatusCode <- 404
+
+let code c (s:string) =
+    let r = Response(Encoding.UTF8.GetBytes s)
+    r.KeepBody <- true
+    r.HttpVersion <- Version("1.1")
+    r.ContentType <- "text/html"
+    r.StatusCode <- c
     r
+
+let notFound = code 404 "404 Not found"
+let ok = code 200 "200 OK"
 
 let getMethod (req: string) =
         match req.Split(' ', 2) with
@@ -34,7 +41,7 @@ let toResponse (http: string) =
                         | -1 -> hb.Split '\n', ""
                         | delim -> hb.Substring(0, delim).Split('\n', StringSplitOptions.TrimEntries ||| StringSplitOptions.RemoveEmptyEntries),
                                    hb.Substring(delim).TrimStart()
-    let r = Response(Encoding.UTF8.GetBytes body) // other encodings are not worthy of my effort
+    let r = Response(Encoding.UTF8.GetBytes body) // other encodings are not worth the effort
     r.KeepBody <- true
     r.HttpVersion <- httpVer
     r.StatusCode <- status

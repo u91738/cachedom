@@ -17,6 +17,8 @@ type Config = {
     [<JsonProperty(Required = Required.Always)>]
     CacheMode: HttpCache.Mode
     [<JsonProperty(Required = Required.Always)>]
+    CacheFailMode: ProxyHandler.NoCache
+    [<JsonProperty(Required = Required.Always)>]
     WaitAfterNavigation: int
     [<JsonProperty(Required = Required.Always)>]
     JsBodyFilter: bool

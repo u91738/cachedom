@@ -1,30 +1,29 @@
 module Test
 
 open System
+open System.IO
 open System.Diagnostics
-open System.Net.Sockets
-open System.Net.NetworkInformation
 open FSharp.Data.LiteralProviders
 open Xunit
 open Swensen.Unquote
 
 open Check
 
-let localhost = // chromium is too smart about local addresses and proxies, use external address
-    let iface = NetworkInterface.GetAllNetworkInterfaces()
-                |> Array.find (fun i ->
-                    i.NetworkInterfaceType <> NetworkInterfaceType.Loopback &&
-                    i.OperationalStatus = OperationalStatus.Up
-                )
-    let ip = iface.GetIPProperties().UnicastAddresses
-             |> Seq.find (fun ip -> ip.Address.AddressFamily = AddressFamily.InterNetwork)
-    string ip.Address
+type TestProxy(useWarc:bool) =
+    let conf = if useWarc then
+                  { Config.Default with
+                      ProxyPort = Config.Default.ProxyPort + 1
+                      CacheFailMode = ProxyHandler.NoCache.Ok
+                  }
+               else Config.Default
 
-type BrowserFixture() =
-    let conf = Config.Default
-    let cache = HttpCache.empty conf.CacheMode [| |]
+    let warcFiles = if useWarc then
+                        [| new StreamReader(File.OpenRead "../../../test/test.warc") |]
+                    else
+                        [| |]
+    let cache = HttpCache.empty conf.CacheMode warcFiles
     let instr = JsInstrumentation.Sync.create false
-    let proxy = Proxy.start (ProxyHandler.onRequest false cache instr) (ProxyHandler.onResponse cache instr) conf.ProxyPort
+    let proxy = Proxy.start (ProxyHandler.onRequest false conf.CacheFailMode cache instr) (ProxyHandler.onResponse cache instr) conf.ProxyPort
     let selproxy = Proxy.selenium "localhost" conf.ProxyPort
     let browser = Browser.get selproxy (not conf.ShowBrowser) conf.UserAgent
 
@@ -43,6 +42,18 @@ type BrowserFixture() =
             member _.Dispose() =
                 browser.Dispose()
                 proxy.Dispose()
+                for i in warcFiles do
+                    i.Dispose()
+
+type BrowserFixture() =
+    let proxy = new TestProxy false
+    let warcProxy = new TestProxy true
+    member this.Ctx useWarc = (if useWarc then warcProxy else proxy).Ctx
+    with
+        interface IDisposable with
+            member _.Dispose() =
+                (proxy:> IDisposable).Dispose()
+                (warcProxy :> IDisposable).Dispose()
 
 type ServerFixture() =
     let proc = Process.Start("sh", "../../../test/server.sh")
@@ -94,67 +105,85 @@ type Tests(ctx:BrowserFixture, srv:ServerFixture) =
     interface IClassFixture<BrowserFixture>
     interface IClassFixture<ServerFixture>
 
-    [<Fact>]
-    member _.``Param write``() =
-        let url = Uri $"http://{localhost}:8000/arg-write.html?a=123"
-        let r = Check.url ctx.Ctx url
+    [<Theory>]
+    [<InlineData(true)>]
+    [<InlineData(false)>]
+    member _.``Param write`` useWarc =
+        let url = Uri $"http://testhost:8000/arg-write.html?a=123"
+        let r = Check.url (ctx.Ctx useWarc) url
         test <@ execOnly r  @>
         test <@ hasArgExec r  @>
 
-    [<Fact>]
-    member _.``Angular frag write``() =
-        let url = Uri $"http://{localhost}:8000/angular.html"
-        let r = Check.url ctx.Ctx url
+    [<Theory>]
+    [<InlineData(true)>]
+    [<InlineData(false)>]
+    member _.``Angular frag write`` useWarc =
+        let url = Uri $"http://testhost:8000/angular.html"
+        let r = Check.url (ctx.Ctx useWarc) url
         test <@ execOnly r  @>
         test <@ hasFragExec r  @>
 
-    [<Fact>]
-    member _.``Vue2 frag``() =
-        let url = Uri $"http://{localhost}:8000/vue2.html"
-        let r = Check.url ctx.Ctx url
+    [<Theory>]
+    [<InlineData(true)>]
+    [<InlineData(false)>]
+    member _.``Vue2 frag`` useWarc =
+        let url = Uri $"http://testhost:8000/vue2.html"
+        let r = Check.url (ctx.Ctx useWarc) url
         test <@ execOnly r  @>
         test <@ hasFragExec r  @>
 
-    [<Fact>]
-    member _.``Vue3 components``() =
-        let url = Uri $"http://{localhost}:8000/vue3-comp.html"
-        let r = Check.url ctx.Ctx url
+    [<Theory>]
+    [<InlineData(true)>]
+    [<InlineData(false)>]
+    member _.``Vue3 components`` useWarc =
+        let url = Uri $"http://testhost:8000/vue3-comp.html"
+        let r = Check.url (ctx.Ctx useWarc) url
         test <@ execOnly r  @>
         test <@ hasFragExec r  @>
 
-    [<Fact>]
-    member _.``Vue2 components``() =
-        let url = Uri $"http://{localhost}:8000/vue2-comp.html"
-        let r = Check.url ctx.Ctx url
+    [<Theory>]
+    [<InlineData(true)>]
+    [<InlineData(false)>]
+    member _.``Vue2 components`` useWarc =
+        let url = Uri $"http://testhost:8000/vue2-comp.html"
+        let r = Check.url (ctx.Ctx useWarc) url
         test <@ execOnly r  @>
         test <@ hasFragExec r  @>
 
-    [<Fact>]
-    member _.``Vue3 frag``() =
-        let url = Uri $"http://{localhost}:8000/vue3.html"
-        let r = Check.url ctx.Ctx url
+    [<Theory>]
+    [<InlineData(true)>]
+    [<InlineData(false)>]
+    member _.``Vue3 frag`` useWarc =
+        let url = Uri $"http://testhost:8000/vue3.html"
+        let r = Check.url (ctx.Ctx useWarc) url
         test <@ execOnly r  @>
         test <@ hasFragExec r  @>
 
-    [<Fact>]
-    member _.``Fragment eval``() =
-        let url = Uri $"http://{localhost}:8000/frag-eval.html?a=123"
-        let r = Check.url ctx.Ctx url
+    [<Theory>]
+    [<InlineData(true)>]
+    [<InlineData(false)>]
+    member _.``Fragment eval`` useWarc =
+        let url = Uri $"http://testhost:8000/frag-eval.html?a=123"
+        let r = Check.url (ctx.Ctx useWarc) url
         test <@ execOnly r  @>
         test <@ hasFragExec r  @>
 
-    [<Fact>]
-    member _.``Fragment setTimeout``() =
-        let url = Uri $"http://{localhost}:8000/frag-timeout.html?a=123"
-        let c = { ctx.Ctx with WaitAfterNavigation = Config.Default.WaitAfterNavigation }
+    [<Theory>]
+    [<InlineData(true)>]
+    [<InlineData(false)>]
+    member _.``Fragment setTimeout`` useWarc =
+        let url = Uri $"http://testhost:8000/frag-timeout.html?a=123"
+        let c = { ctx.Ctx useWarc with WaitAfterNavigation = Config.Default.WaitAfterNavigation }
         let r = Check.url c url
         test <@ execOnly r  @>
         test <@ hasFragExec r  @>
 
-    [<Fact>]
-    member _.``Param write alnum``() =
-        let url = Uri $"http://{localhost}:8000/arg-write-alnum.html?a=123"
-        let r = Check.url ctx.Ctx url
+    [<Theory>]
+    [<InlineData(true)>]
+    [<InlineData(false)>]
+    member _.``Param write alnum`` useWarc =
+        let url = Uri $"http://testhost:8000/arg-write-alnum.html?a=123"
+        let r = Check.url (ctx.Ctx useWarc) url
         test <@ reflOnly r @>
         test <@ hasCharset r (Lower, Body) @>
         test <@ hasCharset r (Upper, Body) @>
@@ -167,10 +196,12 @@ type Tests(ctx:BrowserFixture, srv:ServerFixture) =
         test <@ hasInstrCharset r Numeric @>
         test <@ noInstrCharset r (Special '!') @>
 
-    [<Fact>]
-    member _.``Arg alpha-paren``() =
-        let url = Uri $"http://{localhost}:8000/arg-alpha-paren.html?a=123"
-        let r = Check.url ctx.Ctx url
+    [<Theory>]
+    [<InlineData(true)>]
+    [<InlineData(false)>]
+    member _.``Arg alpha-paren`` useWarc =
+        let url = Uri $"http://testhost:8000/arg-alpha-paren.html?a=123"
+        let r = Check.url (ctx.Ctx useWarc) url
 
         test <@ reflOnly r @>
         test <@ hasCharset r (Lower, Body) @>
@@ -182,54 +213,70 @@ type Tests(ctx:BrowserFixture, srv:ServerFixture) =
         test <@ noCharset r (Special '!', Body) @>
         test <@ noCharset r (Special '!', Log) @>
 
-    [<Fact>]
-    member _.``Arg alpha-paren-br-bt``() =
-        let url = Uri $"http://{localhost}:8000/arg-alpha-dot-bt.html?a=123"
-        let r = Check.url ctx.Ctx url
+    [<Theory>]
+    [<InlineData(true)>]
+    [<InlineData(false)>]
+    member _.``Arg alpha-paren-br-bt`` useWarc =
+        let url = Uri $"http://testhost:8000/arg-alpha-dot-bt.html?a=123"
+        let r = Check.url (ctx.Ctx useWarc) url
         test <@ execOnly r  @>
         test <@ hasArgExec r  @>
 
-    [<Fact>]
-    member _.``No arg static``() =
-        let url = Uri $"http://{localhost}:8000/static.html"
-        let r = Check.url ctx.Ctx url
+    [<Theory>]
+    [<InlineData(true)>]
+    [<InlineData(false)>]
+    member _.``No arg static`` useWarc =
+        let url = Uri $"http://testhost:8000/static.html"
+        let r = Check.url (ctx.Ctx useWarc) url
         test <@ r.Length = 0  @>
 
-    [<Fact>]
-    member _.``No arg boring js``() =
-        let url = Uri $"http://{localhost}:8000/boring-js.html"
-        let r = Check.url ctx.Ctx url
+    [<Theory>]
+    [<InlineData(true)>]
+    [<InlineData(false)>]
+    member _.``No arg boring js`` useWarc =
+        let url = Uri $"http://testhost:8000/boring-js.html"
+        let r = Check.url (ctx.Ctx useWarc) url
         test <@ r.Length = 0  @>
 
-    [<Fact>]
-    member _.``Arg boring js``() =
-        let url = Uri $"http://{localhost}:8000/boring-js.html?a=123"
-        let r = Check.url ctx.Ctx url
+    [<Theory>]
+    [<InlineData(true)>]
+    [<InlineData(false)>]
+    member _.``Arg boring js`` useWarc =
+        let url = Uri $"http://testhost:8000/boring-js.html?a=123"
+        let r = Check.url (ctx.Ctx useWarc) url
         test <@ r.Length = 0  @>
 
-    [<Fact>]
-    member _.``Arg cookie refl``() =
-        let url = Uri $"http://{localhost}:8000/arg-cookie-refl.html?a=123"
-        let c = { ctx.Ctx with InputKinds = Browser.Inputs.Kind.Cookie :: ctx.Ctx.InputKinds }
+    [<Theory>]
+    [<InlineData(true)>]
+    [<InlineData(false)>]
+    member _.``Arg cookie refl`` useWarc =
+        let url = Uri $"http://testhost:8000/arg-cookie-refl.html?a=123"
+        let c = { ctx.Ctx useWarc with InputKinds = Browser.Inputs.Kind.Cookie :: (ctx.Ctx useWarc).InputKinds }
         let r = Check.url c url
         test <@ reflOnly r @>
         test <@ hasCookieCharset r Lower @>
 
-    [<Fact>]
-    member _.``Arg cookie exec``() =
-        let url = Uri $"http://{localhost}:8000/arg-cookie-exec.html?a=123"
-        let c = { ctx.Ctx with InputKinds = Browser.Inputs.Kind.Cookie :: ctx.Ctx.InputKinds }
+    [<Theory>]
+    [<InlineData(true)>]
+    [<InlineData(false)>]
+    member _.``Arg cookie exec`` useWarc =
+        let url = Uri $"http://testhost:8000/arg-cookie-exec.html?a=123"
+        let c = { ctx.Ctx useWarc with InputKinds = Browser.Inputs.Kind.Cookie :: (ctx.Ctx useWarc).InputKinds }
         let r = Check.url c url
         test <@ execOnly r @>
 
 
-    [<Fact>]
-    member _.``JS Instrumentation basic``() =
-        use _ = JsInstrumentation.Sync.withEnabled ctx.Ctx.JsInstr true
-        let url = Uri $"http://{localhost}:8000/boring-js.html"
-        Browser.navigate ctx.Ctx.Browser true url 100
-        Browser.exec ctx.Ctx.Browser TextFile<"js/instrumentation_test.js">.Text |> ignore
-        let instr = JsInstrumentation.Sync.get ctx.Ctx.JsInstr (Browser.exec ctx.Ctx.Browser)
+    [<Theory>]
+    [<InlineData(true)>]
+    [<InlineData(false)>]
+    member _.``JS Instrumentation basic`` useWarc =
+        let c = ctx.Ctx useWarc
+        use _ = JsInstrumentation.Sync.withEnabled c.JsInstr true
+        let url = Uri $"http://testhost:8000/boring-js.html"
+        let navigated = Browser.navigate c.Browser true url 100
+        test <@ navigated @>
+        Browser.exec c.Browser TextFile<"js/instrumentation_test.js">.Text |> ignore
+        let instr = JsInstrumentation.Sync.get c.JsInstr (Browser.exec c.Browser)
         test <@ not instr.IsEmpty @>
         let expectedKeys = [| "Function"; "HTMLElement_addEventListener"; "HTMLElement_innerHTML_set";
                                "HTMLElement_insertAdjacentHTML"; "HTMLElement_outerHTML_set";

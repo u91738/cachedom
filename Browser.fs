@@ -16,6 +16,7 @@ let get proxy isHeadless userAgent : IWebDriver =
     opts.AddArguments [|
          "--disable-dev-shm-usage"
          "--ignore-certificate-errors"
+         "--dns-prefetch-disable"
          |]
     if isHeadless then
         opts.AddArgument "--headless"
@@ -36,11 +37,15 @@ let private waitUrlChange (browser:IWebDriver) prevUrl =
 let navigate (browser:IWebDriver) refresh (url:Uri) (waitAfter:int) =
     let u = browser.Url
     let nav = browser.Navigate()
-    nav.GoToUrl url
-    if refresh then
-        nav.Refresh() // fragment change will have no effect without refresh
-    waitUrlChange browser u
-    Thread.Sleep waitAfter
+    try
+        nav.GoToUrl url
+        if refresh then
+            nav.Refresh() // fragment change will have no effect without refresh
+        waitUrlChange browser u
+        Thread.Sleep waitAfter
+        true
+    with | :? WebDriverTimeoutException ->
+        false
 
 let private stripQuotes (s:string) =
     if s.StartsWith '"' && s.EndsWith '"' then
@@ -123,7 +128,9 @@ module Inputs =
                      | Fragment -> Url.Fragment.map uri transform
                      | Cookie _ -> uri
         let ctx = match input with
-                  | Arg _  | Fragment -> Disposable.data navUri
-                  | Cookie c -> Disposable.withData (new Cookie.Context(browser, c)) navUri
-        navigate browser (not input.IsArg) navUri waitAfter
-        ctx
+                  | Arg _  | Fragment -> Disposable.data (Some navUri)
+                  | Cookie c -> Disposable.withData (new Cookie.Context(browser, c)) (Some navUri)
+        if navigate browser (not input.IsArg) navUri waitAfter then
+            ctx
+        else
+            Disposable.withData ctx.Resource None

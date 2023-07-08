@@ -33,6 +33,14 @@ OPTIONS
     do not run browser in headless mode, mostly a debug feature
 --ignore-cookies
     do not try to put payloads into cookies. Can save a lot of time.
+--cache-fail [not-found|ok|network]
+    if cache has no response reply with
+    not-found
+        HTTP 404, do not allow requests to the real network
+    ok
+        HTTP 200, do not allow requests to the real network
+    network
+        pass request to network
 --cache-mode [precise|strip-arg-values|strip-arg-names-values]
     precise
         respond from cache to requests that fully match previous request in cache

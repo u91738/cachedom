@@ -24,6 +24,14 @@ OPTIONS
     do not run browser in headless mode, mostly a debug feature
 --ignore-cookies
     do not try to put payloads into cookies. Can save a lot of time.
+--cache-fail [not-found|ok|network]
+    if cache has no response reply with
+    not-found
+        HTTP 404, do not allow requests to the real network
+    ok
+        HTTP 200, do not allow requests to the real network
+    network
+        pass request to network
 --cache-mode [precise|strip-arg-values|strip-arg-names-values]
     precise
         respond from cache to requests that fully match previous request in cache
@@ -61,6 +69,12 @@ let rec private parseArgs args urls warc conf =
         parseArgs tail urls warc {conf with CacheMode = HttpCache.Mode.StripArgValues }
     | "--cache-mode" :: "strip-arg-names-values" :: tail ->
         parseArgs tail urls warc {conf with CacheMode = HttpCache.Mode.StripArgNamesValues }
+    | "--cache-fail" :: "not-found" :: tail ->
+        parseArgs tail urls warc {conf with CacheFailMode = ProxyHandler.NoCache.NotFound }
+    | "--cache-fail" :: "ok" :: tail ->
+        parseArgs tail urls warc {conf with CacheFailMode = ProxyHandler.NoCache.Ok }
+    | "--cache-fail" :: "network" :: tail ->
+        parseArgs tail urls warc {conf with CacheFailMode = ProxyHandler.NoCache.PassToNetwork }
     | "--js-body-filter" :: tail ->
         parseArgs tail urls warc {conf with JsBodyFilter = true }
     | "--no-js-body-filter" :: tail ->
@@ -146,7 +160,10 @@ let main argv =
         use warcFiles = Disposable.composite [| for i in warcFilenames -> new StreamReader(File.OpenRead i)|]
         let cache = HttpCache.empty conf.CacheMode warcFiles.Data
         let instr = JsInstrumentation.Sync.create false
-        use _ = Proxy.start (ProxyHandler.onRequest false cache instr) (ProxyHandler.onResponse cache instr) conf.ProxyPort
+        use _ = Proxy.start
+                    (ProxyHandler.onRequest false conf.CacheFailMode cache instr)
+                    (ProxyHandler.onResponse cache instr)
+                    conf.ProxyPort
         let selproxy = Proxy.selenium "localhost" conf.ProxyPort
         use browser = Browser.get selproxy (not conf.ShowBrowser) conf.UserAgent
         let ctx = {

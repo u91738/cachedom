@@ -19,6 +19,8 @@ OPTIONS
 (See default.json for defaults)
 -u URL, --url URL
     url to check, pass multiple --url ... if needed
+-w WARCFILE, --warc WARCFILE
+    path to a warc file to be used as source of server responses, pass multiple --warc ... if needed
 -c configFile, --config configFile
     path to config file. See default.json
 -s, --check-sub-urls

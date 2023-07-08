@@ -22,7 +22,7 @@ let localhost = // chromium is too smart about local addresses and proxies, use 
 
 type BrowserFixture() =
     let conf = Config.Default
-    let cache = HttpCache.empty conf.CacheMode
+    let cache = HttpCache.empty conf.CacheMode [| |]
     let instr = JsInstrumentation.Sync.create false
     let proxy = Proxy.start (ProxyHandler.onRequest false cache instr) (ProxyHandler.onResponse cache instr) conf.ProxyPort
     let selproxy = Proxy.selenium "localhost" conf.ProxyPort

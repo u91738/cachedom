@@ -1,4 +1,5 @@
 ﻿open System
+open System.IO
 open Config
 open Check
 
@@ -9,6 +10,8 @@ OPTIONS
 (See default.json for defaults)
 -u URL, --url URL
     url to check, pass multiple --url ... if needed
+-w WARCFILE, --warc WARCFILE
+    path to a warc file to be used as source of server responses, pass multiple --warc ... if needed
 -c configFile, --config configFile
     path to config file. See default.json
 -s, --check-sub-urls
@@ -33,38 +36,41 @@ OPTIONS
         i.e. reply with response from http://example.com/some/page?a=123
         to request for http://example.com/some/page?x=abc"""
 
-let rec private parseArgs args urls conf =
+let rec private parseArgs args urls warc conf =
     match args with
     | "-h" :: _ | "-?" :: _ | "--help" :: _ ->
         eprintfn "%s" help
         None
     | "-c" :: configFile :: tail
     | "--config" :: configFile :: tail ->
-        parseArgs tail urls (Config.read configFile)
+        parseArgs tail urls warc (Config.read configFile)
     | "-s" :: tail
     | "--check-sub-urls" :: tail ->
-        parseArgs tail urls {conf with CheckSubUrls = true}
+        parseArgs tail urls warc {conf with CheckSubUrls = true}
     | "-u" :: u :: tail
     | "--url" :: u :: tail ->
-        parseArgs tail (Uri u :: urls) conf
+        parseArgs tail (u :: urls) warc conf
     | "-p" :: port :: tail
     | "--proxy-port" :: port :: tail ->
-        parseArgs tail urls {conf with ProxyPort = int (UInt16.Parse port) }
+        parseArgs tail urls warc {conf with ProxyPort = int (UInt16.Parse port) }
     | "--show-browser" :: tail ->
-        parseArgs tail urls {conf with ShowBrowser = true }
+        parseArgs tail urls warc {conf with ShowBrowser = true }
     | "--cache-mode" :: "precise" :: tail ->
-        parseArgs tail urls {conf with CacheMode = HttpCache.Mode.Precise }
+        parseArgs tail urls warc {conf with CacheMode = HttpCache.Mode.Precise }
     | "--cache-mode" :: "strip-arg-values" :: tail ->
-        parseArgs tail urls {conf with CacheMode = HttpCache.Mode.StripArgValues }
+        parseArgs tail urls warc {conf with CacheMode = HttpCache.Mode.StripArgValues }
     | "--cache-mode" :: "strip-arg-names-values" :: tail ->
-        parseArgs tail urls {conf with CacheMode = HttpCache.Mode.StripArgNamesValues }
+        parseArgs tail urls warc {conf with CacheMode = HttpCache.Mode.StripArgNamesValues }
     | "--js-body-filter" :: tail ->
-        parseArgs tail urls {conf with JsBodyFilter = true }
+        parseArgs tail urls warc {conf with JsBodyFilter = true }
     | "--no-js-body-filter" :: tail ->
-        parseArgs tail urls {conf with JsBodyFilter = false }
+        parseArgs tail urls warc {conf with JsBodyFilter = false }
     | "--ignore-cookies" :: tail ->
-        parseArgs tail urls {conf with IgnoreCookies = true }
-    | [] -> Some (urls, conf)
+        parseArgs tail urls warc {conf with IgnoreCookies = true }
+    | "-w" :: fname :: tail
+    | "--warc" :: fname :: tail ->
+        parseArgs tail urls (fname :: warc) conf
+    | [] -> Some (urls, warc, conf)
     | _ -> failwith "Failed to parse arguments"
 
 let private typeDesc t =
@@ -110,12 +116,35 @@ let private urlReport input res =
                     printfn "    call: %s ( %s )" name args
                     printfn "exception stack:\n%s\n" stack
 
+let checkUrls ctx urls =
+    for url in urls do
+        printfn "Check url: %s" (string url)
+        for input, res in Check.url ctx (Uri url) do
+            ctx.Cache.Recent.Clear()
+            urlReport input res
+
+let rec checkUrlsRec ctx urls checkedUrls =
+    match urls with
+    | [] -> ()
+    | url::rest when Set.contains url checkedUrls -> checkUrlsRec ctx rest checkedUrls
+    | url::rest ->
+        printfn "Check url: %s" (string url)
+        let recents = [|
+            for input, res in Check.url ctx (Uri url) do
+                ctx.Cache.Recent.Clear()
+                urlReport input res
+                yield! ctx.Cache.Recent.Keys()
+        |]
+        let newUrls = recents |> Array.map snd |> Array.toList
+        checkUrlsRec ctx (newUrls @ rest) (Set.add url checkedUrls)
+
 [<EntryPoint>]
 let main argv =
-    match parseArgs (Array.toList argv) [] Config.Default with
+    match parseArgs (Array.toList argv) [] [] Config.Default with
     | None -> 1
-    | Some (urls, conf) ->
-        let cache = HttpCache.empty conf.CacheMode
+    | Some (urls, warcFilenames, conf) ->
+        use warcFiles = Disposable.composite [| for i in warcFilenames -> new StreamReader(File.OpenRead i)|]
+        let cache = HttpCache.empty conf.CacheMode warcFiles.Data
         let instr = JsInstrumentation.Sync.create false
         use _ = Proxy.start (ProxyHandler.onRequest false cache instr) (ProxyHandler.onResponse cache instr) conf.ProxyPort
         let selproxy = Proxy.selenium "localhost" conf.ProxyPort
@@ -136,18 +165,9 @@ let main argv =
         }
 
         printfn "------------------------------------------------------------"
-        for url in urls do
-            if conf.CheckSubUrls then
-                HttpCache.clear cache
-                Browser.navigate browser false url conf.WaitAfterNavigation
-                for cached in HttpCache.getAll cache do
-                    let method, cachedUrl = cached.Key
-                    if method = "GET" && cached.Value.HeaderText.Contains("text/html", StringComparison.InvariantCultureIgnoreCase) then
-                        printfn "Check url: %s" (string cachedUrl)
-                        for input, res in Check.url ctx (Uri cachedUrl) do
-                            urlReport input res
-            else
-                printfn "Check url: %s" (string url)
-                for input, res in Check.url ctx url do
-                    urlReport input res
+        if conf.CheckSubUrls then
+            checkUrlsRec ctx urls Set.empty
+        else
+            checkUrls ctx urls
+
         0

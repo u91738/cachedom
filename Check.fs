@@ -2,7 +2,6 @@ module Check
 
 open System
 open System.Linq
-open System.Text.RegularExpressions
 open OpenQA.Selenium
 open XssPayload
 
@@ -39,7 +38,7 @@ type PayloadFilter = Filter | Brute
 
 type Context = {
     Browser: IWebDriver
-    Cache: HttpCache.HttpCache
+    Cache: HttpCache.Recent
     JsInstr: JsInstrumentation.Sync.Instrumentation
     Payloads: XssPayload.Group[]
     WaitAfterNavigation: int
@@ -100,11 +99,11 @@ let private getCommonReflections ctx url input =
             |] |> Map.ofArray
     |] |> Map.ofArray
 
-let private canHaveJs cache =
-    HttpCache.getAll cache
-    |> Array.exists (fun i ->
-        (fst i.Key).Equals("get", StringComparison.InvariantCultureIgnoreCase) &&
-        JsInstrumentation.canHaveJs i.Value.BodyString)
+let private canHaveJs (cache:HttpCache.Recent) =
+    cache.Recent.Keys()
+    |> Array.filter (fun (method, _) -> "get".Equals(method, StringComparison.InvariantCultureIgnoreCase))
+    |> Array.choose (fun (m, u) -> cache.Recent.Get m u)
+    |> Array.exists (fun i -> JsInstrumentation.canHaveJs i.BodyString)
 
 let private checkInput ctx url input =
     let charsets = getCommonReflections ctx url input
@@ -119,7 +118,8 @@ let private checkInput ctx url input =
                     Mul.all
 
     let exec =
-        HttpCache.getRecentResponses ctx.Cache
+        ctx.Cache.Recent.Keys()
+        |> Array.choose (fun (m, u) -> ctx.Cache.Recent.Get m u)
         |> Array.map (fun i -> i.BodyString)
         |> XssPayload.Group.filter ctx.Payloads
         |> Array.allPairs muls
@@ -136,7 +136,6 @@ let private checkInput ctx url input =
 
 let url ctx url =
     Browser.navigate ctx.Browser false (Uri "about:blank") 0
-    HttpCache.clearRecent ctx.Cache
     Browser.navigate ctx.Browser false url ctx.WaitAfterNavigation
     let inputs = Browser.Inputs.get ctx.Browser ctx.InputKinds
     match ctx.FilterMode with

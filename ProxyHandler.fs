@@ -1,12 +1,6 @@
 module ProxyHandler
 
-open Titanium.Web.Proxy.Http
 open Titanium.Web.Proxy.EventArguments
-
-let private notFound =
-    let r = Response()
-    r.StatusCode <- 404
-    r
 
 let private blockHosts = [|
     "accounts.google.com"
@@ -15,32 +9,20 @@ let private blockHosts = [|
     ".gvt1.com"
 |]
 
-let withBody (resp:Response) body =
-    let r = Response(body)
-    r.StatusCode <- resp.StatusCode
-    r.StatusDescription <- resp.StatusDescription
-    r.ContentType <- resp.ContentType
-    r.HttpVersion <- resp.HttpVersion
-    r.KeepBody <- true
-    for h in resp.Headers do
-        if h.Name <> "Content-Length" && h.Name <> "Content-Type" then
-            r.Headers.AddHeader h
-    r
-
-let onRequest verbose cache instr (e: SessionEventArgs) =
+let onRequest verbose (cache:HttpCache.ICache) instr (e: SessionEventArgs) =
     task {
         try
             if blockHosts |> Array.exists e.HttpClient.Request.RequestUri.Host.Contains then
-                e.Respond notFound
+                e.Respond Http.notFound
             else
-                match HttpCache.get cache e.HttpClient.Request.Method e.HttpClient.Request.Url with
+                match cache.Get e.HttpClient.Request.Method e.HttpClient.Request.Url with
                 | Some resp ->
                     if verbose then
                         printfn "Cached response to %s %s" e.HttpClient.Request.Method e.HttpClient.Request.Url
 
                     match JsInstrumentation.Sync.add instr resp.ContentType resp.BodyString with
                     | Some instrBody ->
-                        instrBody |> resp.Encoding.GetBytes |> withBody resp |> e.Respond
+                        instrBody |> resp.Encoding.GetBytes |> Http.withBody resp |> e.Respond
                     | None -> e.Respond resp
                 | None ->
                     if verbose then
@@ -48,14 +30,14 @@ let onRequest verbose cache instr (e: SessionEventArgs) =
         with e -> eprintfn "onRequest exception\n%A" e
     }
 
-let onResponse cache instr (e: SessionEventArgs) =
+let onResponse (cache:HttpCache.ICache) instr (e: SessionEventArgs) =
     task {
         try
             e.HttpClient.Response.KeepBody <- true
             if e.HttpClient.Response.HasBody then
                 let! _ = e.GetResponseBody()
                 ()
-            HttpCache.add cache e.HttpClient.Request.Method e.HttpClient.Request.Url e.HttpClient.Response
+            cache.Put e.HttpClient.Request.Method e.HttpClient.Request.Url e.HttpClient.Response |> ignore
 
             JsInstrumentation.Sync.add instr e.HttpClient.Response.ContentType e.HttpClient.Response.BodyString
             |> Option.iter e.SetResponseBodyString
